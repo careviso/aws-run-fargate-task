@@ -1,7 +1,7 @@
 {
   "name": "aws-run-fargate-task",
   "version": "1.0.0",
-  "description": "Run and wait untill stopped task on AWS ECS fargate instance.",
+  "description": "Run and wait until stopped task on AWS ECS fargate instance.",
   "main": "dist/index.js",
   "scripts": {
     "format": "prettier --write src",
@@ -23,7 +23,7 @@
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^5.1.0",
     "@typescript-eslint/parser": "^5.1.0",
-    "@vercel/ncc": "^0.31.1",
+    "@vercel/ncc": "^0.38.1",
     "env-cmd": "^10.1.0",
     "eslint": "^8.1.0",
     "prettier": "^2.4.1",
