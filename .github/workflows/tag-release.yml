@@ -1,0 +1,38 @@
+name: Tag release
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: version
+        run: echo "value=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+
+      - env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
+            echo "v$VERSION already tagged; nothing to do."
+            exit 0
+          fi
+
+          MAJOR="${VERSION%%.*}"
+
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
+
+          # Floating major tag consumers pin to; moves with each release, so force.
+          git tag -f "v$MAJOR"
+          git push origin -f "v$MAJOR"
