@@ -1,5 +1,18 @@
-import ECS, { KeyValuePair, RunTaskRequest } from 'aws-sdk/clients/ecs';
-import EC2, { Filter } from 'aws-sdk/clients/ec2';
+import {
+  DescribeClustersCommand,
+  DescribeTasksCommand,
+  ECSClient,
+  KeyValuePair,
+  RunTaskCommand,
+  RunTaskCommandInput,
+  waitUntilTasksStopped,
+} from '@aws-sdk/client-ecs';
+import {
+  DescribeSecurityGroupsCommand,
+  DescribeSubnetsCommand,
+  EC2Client,
+  Filter,
+} from '@aws-sdk/client-ec2';
 import * as core from '@actions/core';
 
 export class ClusterNotFound extends Error {}
@@ -25,11 +38,11 @@ interface Params {
   capacityProvider?: CapacityProvider;
 }
 
-const ecs = new ECS();
-const ec2 = new EC2();
+const ecs = new ECSClient({});
+const ec2 = new EC2Client({});
 
 async function hasCluster(cluster: string) {
-  const foundedClusters = await ecs.describeClusters({ clusters: [cluster] }).promise();
+  const foundedClusters = await ecs.send(new DescribeClustersCommand({ clusters: [cluster] }));
 
   return foundedClusters.clusters?.[0]?.clusterName === cluster;
 }
@@ -62,19 +75,19 @@ export default async function runTask(
 
   const { securityGroupIds, sbnIds } = await core.group('Fetch network settings', async () => {
     const [sg, subnets] = await Promise.all([
-      ec2
-        .describeSecurityGroups({
+      ec2.send(
+        new DescribeSecurityGroupsCommand({
           Filters: sgFilters,
           GroupIds: sgIds,
           GroupNames: sgNames,
-        })
-        .promise(),
-      ec2
-        .describeSubnets({
+        }),
+      ),
+      ec2.send(
+        new DescribeSubnetsCommand({
           Filters: subnetFilters,
           SubnetIds: subnetIds,
-        })
-        .promise(),
+        }),
+      ),
     ]);
 
     const securityGroupIds =
@@ -95,7 +108,7 @@ export default async function runTask(
   return await core.group('Flush task to ECS', async () => {
     core.info(`Run task: ${taskName}`);
 
-    const runTaksRequestParams: RunTaskRequest = {
+    const runTaksRequestParams: RunTaskCommandInput = {
       count,
       cluster,
       taskDefinition: taskName,
@@ -130,7 +143,7 @@ export default async function runTask(
       ];
     }
 
-    const runTaskResponse = await ecs.runTask(runTaksRequestParams).promise();
+    const runTaskResponse = await ecs.send(new RunTaskCommand(runTaksRequestParams));
 
     if (!runTaskResponse.tasks?.length || !runTaskResponse.tasks[0].taskArn) {
       console.log('Run ecs task response >>>', runTaskResponse);
@@ -150,25 +163,20 @@ export default async function runTask(
 
     const tasks = [runTaskResponse.tasks[0].taskArn];
 
-    await ecs
-      .waitFor('tasksStopped', {
-        cluster,
-        tasks,
-        $waiter: {
-          delay: pollDelay,
-          maxAttempts: timeout / pollDelay,
-        },
-      })
-      .promise();
+    await waitUntilTasksStopped(
+      {
+        client: ecs,
+        maxWaitTime: timeout,
+        // min === max pins a fixed poll interval; left unset, v3 backs off exponentially to 600s.
+        minDelay: pollDelay,
+        maxDelay: pollDelay,
+      },
+      { cluster, tasks },
+    );
 
     core.info('Task stopped. Checkout exit state.');
 
-    const taskState = await ecs
-      .describeTasks({
-        cluster,
-        tasks,
-      })
-      .promise();
+    const taskState = await ecs.send(new DescribeTasksCommand({ cluster, tasks }));
 
     if (!taskState.tasks?.length || !taskState.tasks[0].taskArn) {
       core.error(`Error: task "${taskName}" couldn't fetch current state!`);
