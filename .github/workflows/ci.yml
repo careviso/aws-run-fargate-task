@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run type-check
+      - run: npm run lint
+      - run: npx prettier --check src
+
+  dist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+      # dist/ is committed and is what the action actually executes, so a stale
+      # bundle ships silently while the source looks correct.
+      - name: Verify dist/ matches src/
+        run: |
+          if ! git diff --quiet -- dist/; then
+            echo "::error::dist/ is stale. Run 'npm run build' and commit the result."
+            git diff --stat -- dist/
+            exit 1
+          fi
