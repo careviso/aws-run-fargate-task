@@ -28,13 +28,13 @@ In case you need check cluster exists:
 
 ```yaml
 - name: Configure AWS Credentials
-  uses: aws-actions/configure-aws-credentials@v1
+  uses: aws-actions/configure-aws-credentials@v6
   with:
     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     aws-region: us-east-2
 - name: Run my ECS task
-  uses: zamarawka/aws-run-fargate-task@v1
+  uses: careviso/aws-run-fargate-task@v2
   with:
     task_name: my-ecs-task
     cluster: my-ecs-cluster
@@ -45,24 +45,36 @@ In case you need check cluster exists:
 ## Versioning
 
 Package follows [semver](https://semver.org) versioning model.
-At now actual package major version is `v1`.
-New releases comes with bump version's (`v1.x.x`), but `v1` tag is moving to latest on whole `v1` major release.
-So, you could use this github action by this way:
+The current major version is `v2`.
+Releases are tagged `v2.x.x`, and the `v2` tag moves to the latest release within the major.
+So you can pin the major and stay on the latest fixes and features:
 
 ```yaml
-- uses: zamarawka/aws-run-fargate-task@v1
+- uses: careviso/aws-run-fargate-task@v2
 ```
 
-And stay on actual release with last fixes and features.
-On new major release (in case api breaking change) will be added v2 tag with same update policy.
+A breaking API change gets a new major and a `v3` tag with the same policy.
 
-Not recommended use action by branch name on production, like this:
+Pinning a branch is not recommended on production:
 
 ```yaml
-- uses: zamarawka/aws-run-fargate-task@master
+- uses: careviso/aws-run-fargate-task@master
 ```
 
 This is unsafe and could unpredictable break your CI process.
+
+### Upgrading from v1
+
+`v2` replaces AWS SDK for JavaScript v2 with v3. Inputs and outputs are unchanged, but two
+behaviours differ:
+
+- **Credentials** resolve through the v3 provider chain. Setups using
+  `aws-actions/configure-aws-credentials` are unaffected; those relying on v2-only behaviour
+  (such as `AWS_SDK_LOAD_CONFIG` for shared-config profiles) may resolve differently.
+- **`timeout`** is wall-clock time. v1 counted poll attempts and excluded request time, so a slow
+  ECS API can now time out sooner for the same value.
+
+`v1` stays available and pinned to the SDK v2 implementation, but receives no further updates.
 
 ## Inputs
 
