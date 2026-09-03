@@ -1,5 +1,5 @@
-import { KeyValuePair } from 'aws-sdk/clients/ecs';
-import { Filter } from 'aws-sdk/clients/ec2';
+import { KeyValuePair } from '@aws-sdk/client-ecs';
+import { Filter } from '@aws-sdk/client-ec2';
 export declare class ClusterNotFound extends Error {
 }
 export declare class TaskCreationError extends Error {
